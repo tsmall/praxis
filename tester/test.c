@@ -15,19 +15,25 @@ int main(int argc, char** argv) {
 
 	if (childpid == 0) {
 		// child
+		close(pipefds[0]);
 		printf("child: spawned\n");
 
-		close(pipefds[0]);
-		write(pipefds[1], "Hello.\n", 8);
+		// send stdout and stderr to the pipe
+		dup2(pipefds[1], 1);
+		dup2(pipefds[1], 2);
+
+		printf("child: stdout\n");
+		sleep(1);
+		fprintf(stderr, "child: stderr\n");
 		sleep(1);
 	}
 	else {
 		// parent
-		printf("parent: still running\n");
-		char buffer[10];
-
 		close(pipefds[1]);
-		if (read(pipefds[0], buffer, 8) != -1) {
+		printf("parent: still running\n");
+
+		char buffer[20];
+		while (read(pipefds[0], buffer, 15) > 0) {
 			printf("parent: got value from child\n");
 			printf("parent: %s\n", buffer);
 		}
