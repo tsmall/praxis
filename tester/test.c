@@ -26,15 +26,8 @@ int main(int argc, char** argv) {
 		dup2(stdoutpipe[1], STDOUT_FILENO);
 		dup2(stdoutpipe[1], STDERR_FILENO);
 
-		char buffer[1024];
-		fgets(buffer, sizeof(buffer), stdin);
-		buffer[strcspn(buffer, "\n")] = '\0';
-		printf("child: received <%s>\n", buffer);
-
-		sleep(1);
-
-		close(stdoutpipe[1]);
-		close(stdinpipe[0]);
+		char* argv[] = { "cat", "-" };
+		execvp(argv[0], argv);
 	}
 	else {
 		// parent
@@ -44,6 +37,7 @@ int main(int argc, char** argv) {
 		FILE* instream = fdopen(stdinpipe[1], "w");
 		fprintf(instream, "Hi!\n");
 		fflush(instream);
+		fclose(instream);
 
 		char buffer[1024];
 		FILE* outstream = fdopen(stdoutpipe[0], "r");
