@@ -10,7 +10,19 @@
 
 typedef enum { false, true } bool;
 
-void runproc(const char* path, char* const argv[], const char* input, char* out, int outsize) {
+typedef struct ProcInfo {
+	char* path;
+	char** argv;
+} ProcInfo;
+
+typedef struct TestInfo {
+	ProcInfo proc;
+	char* input;
+	char* expected;
+	bool passed;
+} TestInfo;
+
+void runproc(ProcInfo proc, const char* input, char* out, int outsize) {
 	int stdoutpipe[2], stdinpipe[2];
 	pipe(stdoutpipe);
 	pipe(stdinpipe);
@@ -32,7 +44,7 @@ void runproc(const char* path, char* const argv[], const char* input, char* out,
 		dup2(stdoutpipe[WRITE], STDOUT_FILENO);
 		dup2(stdoutpipe[WRITE], STDERR_FILENO);
 
-		execv(path, argv);
+		execv(proc.path, proc.argv);
 	}
 	else {
 		// parent
@@ -47,33 +59,42 @@ void runproc(const char* path, char* const argv[], const char* input, char* out,
 		/* TODO: Handle multiple line output */
 		FILE* outstream = fdopen(stdoutpipe[READ], "r");
 		while (!feof(outstream) && !ferror(outstream) && fgets(out, outsize, outstream)) {
-			printf("parent: got value from child\n");
-			printf("parent: %s", out);
 		}
 
 		int status;
 		waitpid(childpid, &status, 0);
-		printf("parent: child process ended\n");
 
-		// fclose(instream);
+		fclose(instream);
 		close(stdoutpipe[READ]);
 		close(stdinpipe[WRITE]);
 	}
 }
 
-bool runtest(const char* path, char* const argv[], const char* input, const char* expected) {
+void runtest(TestInfo* test) {
 	char buffer[1024];
-	runproc(path, argv, input, buffer, sizeof(buffer));
-	return strcmp(expected, buffer) == 0;
+	runproc(test->proc, test->input, buffer, sizeof(buffer));
+	test->passed = (strcmp(test->expected, buffer) == 0);
 }
 
 int main(int argc, char* argv[]) {
-	char* childargv[] = { "cat", "-", NULL };
-	char* input = "Hi!\n";
-	char* expected = "Hi!\n";
+	char* childargv[2];
+	childargv[0] = "python";
+	childargv[1] = "/Users/tom/Projects/praxis/0001-rpn/rpn.py";
 
-	bool successful = runtest("/bin/cat", childargv, input, expected);
-	printf("result: %d\n", successful);
+	ProcInfo proc;
+	proc.path = "/usr/bin/python";
+	proc.argv = childargv;
+
+	char* input = "1 1 +\n";
+	char* expected = "[2.0]\n";
+
+	TestInfo test;
+	test.proc = proc;
+	test.input = input;
+	test.expected = expected;
+
+	runtest(&test);
+	printf("result: %s\n", test.passed ? "passed" : "failed");
 
 	return 0;
 }
